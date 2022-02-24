@@ -1,19 +1,12 @@
 
 /*
-  Stepper Motor Control - speed control
+  Stepper Motor Control - XY Petri Dish
 
-  This program drives a unipolar or bipolar stepper motor.
-  The motor is attached to digital pins 8 - 11 of the Arduino.
-  A potentiometer is connected to analog input 0.
-
-  The motor will rotate in a clockwise direction. The higher the potentiometer value,
-  the faster the motor speed. Because setSpeed() sets the delay between steps,
-  you may notice the motor is less responsive to changes in the sensor value at
-  low speeds.
-
-  Created 30 Nov. 2009
-  Modified 28 Oct 2010
-  by Tom Igoe
+  TODO: Add Homing Functionality
+        Fix edge of circle
+        Check circle at smaller grid size
+        (Grid Sizes: [2.172, 1.577], [1.86, 1.351])
+        Add button to change between the grid sizes
 
 */
 
@@ -134,54 +127,54 @@ int pause = 1000;
 
 
 //Inefficiency in how snake handles lower half of petri dish
-void snake(int snakeSpeed, int spr, double stepSize){
+void snake(int snakeSpeed, int spr, double stepX, double stepY){
   //TODO Add Homing Feature
   int x = 0;
   int y = 0; //Positive y means that it has gone down on the y axis
   for(int i = 0; i < 34; i++){
     if(i % 2 == 1){
       while(!grids[i][x]){
-        moveX(-stepSize, snakeSpeed, spr);
+        moveX(-stepX, snakeSpeed, spr);
         x--;
       }
 
       while(x >= 0 && grids[i][x]){
         grids[i][x] = 0;
         delay(pause);
-        moveX(-stepSize, snakeSpeed, spr);
+        moveX(-stepX, snakeSpeed, spr);
         x--;
       }
       if(x - 1 >= 0){
         if(x - 2 >= 0){
-          moveX(-stepSize, snakeSpeed, spr);
+          moveX(-stepX, snakeSpeed, spr);
           x--;
         }
-        moveX(-stepSize, snakeSpeed, spr);
+        moveX(-stepX, snakeSpeed, spr);
         x--;
       }
       
     }else{
       while(!grids[i][x]){
-        moveX(stepSize, snakeSpeed, spr);
+        moveX(stepX, snakeSpeed, spr);
         x++;
       }
       
       while(x < 34 && grids[i][x]){
         grids[i][x] = 0;
         delay(pause);
-        moveX(stepSize, snakeSpeed, spr);
+        moveX(stepX, snakeSpeed, spr);
         x++;
       }
       if(x + 1 < 34){
         if(x + 2 < 34){
-          moveX(stepSize, snakeSpeed, spr);
+          moveX(stepX, snakeSpeed, spr);
           x++;
         }
-        moveX(stepSize, snakeSpeed, spr);
+        moveX(stepX, snakeSpeed, spr);
         x++;
       }
     }
-    moveY(-stepSize, snakeSpeed, spr);
+    moveY(-stepY, snakeSpeed, spr);
     y++;
     
   }
@@ -200,7 +193,7 @@ void loop() {
     fillWithTrue();
     displayGrids();
 
-    snake(moveOnceSpeed, stepsPerRevolution, 1.5);
+    snake(moveOnceSpeed, stepsPerRevolution, 1.5, 2);
 
     displayGrids();
     
@@ -209,7 +202,7 @@ void loop() {
   
 }
 
-double revolutionsPerMM = 2; //Depends on thread size (pitch), how many times the motor must rotate to move one mm
+double revolutionsPerMM = 5; //D5epends on thread size (pitch), how many times the motor must rotate to move one mm
 
 //Moves right + dist (mm)
 //Moves Left  - dist (mm)
