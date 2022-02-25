@@ -219,10 +219,9 @@ void moveY(double dist, int s, int spr) {
   double steps = (spr * revolutionsPerMM) * dist;
   yStepper.step(steps);
 }
-
-void midptellipse(int rx, int ry,
-                  int xc, int yc)
-{
+//Major Radius, Minor Radius, Center Coordinates
+void drawEllipse(int rx, int ry, int xc, int yc){
+    
     float dx, dy, d1, d2, x, y;
     x = 0;
     y = ry;
