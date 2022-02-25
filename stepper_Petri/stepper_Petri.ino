@@ -3,8 +3,7 @@
   Stepper Motor Control - XY Petri Dish
 
   TODO: Add Homing Functionality
-        Fix edge of circle
-        Check circle at smaller grid size
+        Switch Circle to Ellipse
         (Grid Sizes: [2.172, 1.577], [1.86, 1.351])
         Add button to change between the grid sizes
 
@@ -21,23 +20,22 @@ Stepper yStepper(200, 7, 6, 5, 4);   //TODO change ystepper pins
 
 
 
-bool grids[34][34];
+bool grids[38][38];
 
 void setup() {
-  const double gridSize = 1.5;  //size of a single grid square in mm
-  const int sizeOfPetri = 50; //diameter of petri dish in mm
+  
   Serial.begin(115200);
 }
 
 int roundUp(double x) {
-  int intX = 1000 * x;
-  if (intX % 1000 != 0) {
-    return (intX / 1000) + 1;
+  int intX = 1000000 * x;
+  if (intX % 1000000 != 0) {
+    return (intX / 1000000) + 1;
   }
   return intX;
 }
 
-int loopCount = 0;
+short loopCount = 0;
 
 void midPointCircleDraw(int x_center, int y_center, int r) {
   int x = r;
@@ -180,20 +178,40 @@ void snake(int snakeSpeed, int spr, double stepX, double stepY) {
   }
 }
 
+//Write code
+//Machine can only move to an accuracy of so much, round grid square size up to match tolerance
+double roundToMin(double x){
+  return x;
+}
+
+double revolutionsPerMM = 5; //D5epends on thread size (pitch), how many times the motor must rotate to move one mm
+
 void loop() {
   const int moveOnceSpeed = 25; //speed of stepper motor, % from 0-100
   const int stepsPerRevolution = 200;
-  int half0 = round(34 / 2);
-  int half1 = int(25 / 2);
+  const double gridSizeX = 2.172;           //size of the length (X) of a grid square in mm
+  const double gridSizeY = 1.577;           //size of the length (Y) of a grid square in mm
+  const int sizeOfPetri = 50;               //diameter of petri dish in mm
+  int center = roundUp(sizeof(grids) / 2);   //Center of grids
+
+  double xSize = roundToMin(gridSizeX);
+  double ySize = roundToMin(gridSizeY);
+  int xRadius = roundUp(sizeOfPetri / xSize);
+  int yRadius = roundUp(sizeOfPetri / ySize);
   //0,0 cant be center of circle
   if (loopCount == 0) {
-    midPointCircleDraw(half0, half0, half0 - 1);
-    grids[17][1] = 1;
-    grids[1][17] = 1;
+//    midPointCircleDraw(half0, half0, half0 - 1);
+//    grids[17][1] = 1;
+//    grids[1][17] = 1;
+
+    if(max(xRadius, yRadius) == xRadius){
+      drawEllipse(xRadius, yRadius, center, center);
+    }
+    
     fillWithTrue();
     displayGrids();
 
-    snake(moveOnceSpeed, stepsPerRevolution, 1.5, 2);
+    //snake(moveOnceSpeed, stepsPerRevolution, 1.5, 2);
 
     displayGrids();
 
@@ -202,7 +220,6 @@ void loop() {
 
 }
 
-double revolutionsPerMM = 5; //D5epends on thread size (pitch), how many times the motor must rotate to move one mm
 
 //Moves right + dist (mm)
 //Moves Left  - dist (mm)
@@ -219,12 +236,14 @@ void moveY(double dist, int s, int spr) {
   double steps = (spr * revolutionsPerMM) * dist;
   yStepper.step(steps);
 }
-//Major Radius, Minor Radius, Center Coordinates
-void drawEllipse(int rx, int ry, int xc, int yc) {
 
-  float dx, dy, d1, d2, x, y;
-  x = 0;
-  y = ry;
+//Draw Ellipse for Petri Dish
+//Major Radius, Minor Radius, Center Coordinates
+void drawEllipse(int rx, int ry, int x_center, int y_center) {
+
+  float dx, dy, d1, d2;
+  int x = 0;
+  int y = ry;
 
   // Initial decision parameter of region 1
   d1 = (ry * ry) - (rx * rx * ry) +
@@ -236,10 +255,10 @@ void drawEllipse(int rx, int ry, int xc, int yc) {
   while (dx < dy){
 
     // Print points based on 4-way symmetry
-    cout << x + xc << " , " << y + yc << endl;
-    cout << -x + xc << " , " << y + yc << endl;
-    cout << x + xc << " , " << -y + yc << endl;
-    cout << -x + xc << " , " << -y + yc << endl;
+    grids[x + x_center][y + y_center] = 1;
+    grids[-x + x_center][y + y_center] = 1;
+    grids[x + x_center][-y + y_center] = 1;
+    grids[-x + x_center][-y + y_center] = 1;
 
     // Checking and updating value of
     // decision parameter based on algorithm
@@ -264,12 +283,12 @@ void drawEllipse(int rx, int ry, int xc, int yc) {
 
   // Plotting points of region 2
   while (y >= 0){
-
+    
     // Print points based on 4-way symmetry
-    cout << x + xc << " , " << y + yc << endl;
-    cout << -x + xc << " , " << y + yc << endl;
-    cout << x + xc << " , " << -y + yc << endl;
-    cout << -x + xc << " , " << -y + yc << endl;
+    grids[x + x_center][y + y_center] = 1;
+    grids[-x + x_center][y + y_center] = 1;
+    grids[x + x_center][-y + y_center] = 1;
+    grids[-x + x_center][-y + y_center] = 1;
 
     // Checking and updating parameter
     // value based on algorithm
@@ -277,8 +296,7 @@ void drawEllipse(int rx, int ry, int xc, int yc) {
       y--;
       dy = dy - (2 * rx * rx);
       d2 = d2 + (rx * rx) - dy;
-    }
-    else{
+    }else{
       y--;
       x++;
       dx = dx + (2 * ry * ry);
