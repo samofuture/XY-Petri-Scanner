@@ -16,7 +16,7 @@
 
 // initialize the stepper library on pins 8 through 11:
 Stepper xStepper(200, 8, 9, 10, 11);
-Stepper yStepper(200, 7, 6, 5, 4);   //TODO change ystepper pins
+Stepper yStepper(200, 4, 5, 6, 7);   //TODO change ystepper pins
 
 
 
@@ -187,7 +187,7 @@ double roundToMin(double x){
 double revolutionsPerMM = 5; //D5epends on thread size (pitch), how many times the motor must rotate to move one mm
 
 void loop() {
-  const int moveOnceSpeed = 25; //speed of stepper motor, % from 0-100
+  const int moveOnceSpeed = 50; //speed of stepper motor, % from 0-100
   const int stepsPerRevolution = 200;
   const double gridSizeX = 2.172;           //size of the length (X) of a grid square in mm
   const double gridSizeY = 1.577;           //size of the length (Y) of a grid square in mm
@@ -200,18 +200,18 @@ void loop() {
   int yRadius = roundUp(sizeOfPetri / ySize);
   //0,0 cant be center of circle
   if (loopCount == 0) {
-//    midPointCircleDraw(half0, half0, half0 - 1);
-//    grids[17][1] = 1;
-//    grids[1][17] = 1;
+    midPointCircleDraw(center, center, center);
+    grids[17][1] = 1;
+    grids[1][17] = 1;
 
-    if(max(xRadius, yRadius) == xRadius){
-      drawEllipse(xRadius, yRadius, center, center);
-    }
+//    if(max(xRadius, yRadius) == xRadius){
+//      drawEllipse(xRadius, yRadius, center, center);
+//    }
     
     fillWithTrue();
     displayGrids();
 
-    //snake(moveOnceSpeed, stepsPerRevolution, 1.5, 2);
+    snake(moveOnceSpeed, stepsPerRevolution, 1.5, 2);
 
     displayGrids();
 
