@@ -102,71 +102,71 @@ void displayGrids() {
   }
 }
 
-void fillWithTrue(){
+void fillWithTrue() {
   bool checkBeg = 0;
   bool checkMid = 0;
   bool checkSta = 0;
-  for(int i = 0; i < 34; i++){
-    for(int j = 0; j < 34; j++){
-      if(grids[i][j] && !grids[i][j+1]){
-        if(checkBeg){
+  for (int i = 0; i < 34; i++) {
+    for (int j = 0; j < 34; j++) {
+      if (grids[i][j] && !grids[i][j + 1]) {
+        if (checkBeg) {
           checkBeg = 0;
-        }else{
+        } else {
           checkBeg = 1;
         }
-      }else if(checkBeg && i != 1 && i != 33){
+      } else if (checkBeg && i != 1 && i != 33) {
         grids[i][j] = 1;
       }
     }
     checkBeg = 0;
   }
-  
+
 }
 
 int pause = 1000;
 
 
 //Inefficiency in how snake handles lower half of petri dish
-void snake(int snakeSpeed, int spr, double stepX, double stepY){
+void snake(int snakeSpeed, int spr, double stepX, double stepY) {
   //TODO Add Homing Feature
   int x = 0;
   int y = 0; //Positive y means that it has gone down on the y axis
-  for(int i = 0; i < 34; i++){
-    if(i % 2 == 1){
-      while(!grids[i][x]){
+  for (int i = 0; i < 34; i++) {
+    if (i % 2 == 1) {
+      while (!grids[i][x]) {
         moveX(-stepX, snakeSpeed, spr);
         x--;
       }
 
-      while(x >= 0 && grids[i][x]){
+      while (x >= 0 && grids[i][x]) {
         grids[i][x] = 0;
         delay(pause);
         moveX(-stepX, snakeSpeed, spr);
         x--;
       }
-      if(x - 1 >= 0){
-        if(x - 2 >= 0){
+      if (x - 1 >= 0) {
+        if (x - 2 >= 0) {
           moveX(-stepX, snakeSpeed, spr);
           x--;
         }
         moveX(-stepX, snakeSpeed, spr);
         x--;
       }
-      
-    }else{
-      while(!grids[i][x]){
+
+    } else {
+      while (!grids[i][x]) {
         moveX(stepX, snakeSpeed, spr);
         x++;
       }
-      
-      while(x < 34 && grids[i][x]){
+
+      while (x < 34 && grids[i][x]) {
         grids[i][x] = 0;
         delay(pause);
         moveX(stepX, snakeSpeed, spr);
         x++;
       }
-      if(x + 1 < 34){
-        if(x + 2 < 34){
+      if (x + 1 < 34) {
+        if (x + 2 < 34) {
           moveX(stepX, snakeSpeed, spr);
           x++;
         }
@@ -176,7 +176,7 @@ void snake(int snakeSpeed, int spr, double stepX, double stepY){
     }
     moveY(-stepY, snakeSpeed, spr);
     y++;
-    
+
   }
 }
 
@@ -196,10 +196,10 @@ void loop() {
     snake(moveOnceSpeed, stepsPerRevolution, 1.5, 2);
 
     displayGrids();
-    
+
     loopCount++;
   }
-  
+
 }
 
 double revolutionsPerMM = 5; //D5epends on thread size (pitch), how many times the motor must rotate to move one mm
@@ -220,76 +220,70 @@ void moveY(double dist, int s, int spr) {
   yStepper.step(steps);
 }
 //Major Radius, Minor Radius, Center Coordinates
-void drawEllipse(int rx, int ry, int xc, int yc){
-    
-    float dx, dy, d1, d2, x, y;
-    x = 0;
-    y = ry;
- 
-    // Initial decision parameter of region 1
-    d1 = (ry * ry) - (rx * rx * ry) +
-                     (0.25 * rx * rx);
-    dx = 2 * ry * ry * x;
-    dy = 2 * rx * rx * y;
- 
-    // For region 1
-    while (dx < dy)
-    {
- 
-        // Print points based on 4-way symmetry
-        cout << x + xc << " , " << y + yc << endl;
-        cout << -x + xc << " , " << y + yc << endl;
-        cout << x + xc << " , " << -y + yc << endl;
-        cout << -x + xc << " , " << -y + yc << endl;
- 
-        // Checking and updating value of
-        // decision parameter based on algorithm
-        if (d1 < 0)
-        {
-            x++;
-            dx = dx + (2 * ry * ry);
-            d1 = d1 + dx + (ry * ry);
-        }
-        else
-        {
-            x++;
-            y--;
-            dx = dx + (2 * ry * ry);
-            dy = dy - (2 * rx * rx);
-            d1 = d1 + dx - dy + (ry * ry);
-        }
+void drawEllipse(int rx, int ry, int xc, int yc) {
+
+  float dx, dy, d1, d2, x, y;
+  x = 0;
+  y = ry;
+
+  // Initial decision parameter of region 1
+  d1 = (ry * ry) - (rx * rx * ry) +
+       (0.25 * rx * rx);
+  dx = 2 * ry * ry * x;
+  dy = 2 * rx * rx * y;
+
+  // For region 1
+  while (dx < dy){
+
+    // Print points based on 4-way symmetry
+    cout << x + xc << " , " << y + yc << endl;
+    cout << -x + xc << " , " << y + yc << endl;
+    cout << x + xc << " , " << -y + yc << endl;
+    cout << -x + xc << " , " << -y + yc << endl;
+
+    // Checking and updating value of
+    // decision parameter based on algorithm
+    if (d1 < 0){
+      x++;
+      dx = dx + (2 * ry * ry);
+      d1 = d1 + dx + (ry * ry);
     }
-    
-    // Decision parameter of region 2
-    d2 = ((ry * ry) * ((x + 0.5) * (x + 0.5))) +
-         ((rx * rx) * ((y - 1) * (y - 1))) -
-          (rx * rx * ry * ry);
- 
-    // Plotting points of region 2
-    while (y >= 0)
-    {
- 
-        // Print points based on 4-way symmetry
-        cout << x + xc << " , " << y + yc << endl;
-        cout << -x + xc << " , " << y + yc << endl;
-        cout << x + xc << " , " << -y + yc << endl;
-        cout << -x + xc << " , " << -y + yc << endl;
- 
-        // Checking and updating parameter
-        // value based on algorithm
-        if (d2 > 0)
-        {
-            y--;
-            dy = dy - (2 * rx * rx);
-            d2 = d2 + (rx * rx) - dy;
-        }
-        else
-        {
-            y--;
-            x++;
-            dx = dx + (2 * ry * ry);
-            dy = dy - (2 * rx * rx);
-            d2 = d2 + dx - dy + (rx * rx);
-        }
+    else{
+      x++;
+      y--;
+      dx = dx + (2 * ry * ry);
+      dy = dy - (2 * rx * rx);
+      d1 = d1 + dx - dy + (ry * ry);
     }
+  }
+
+  // Decision parameter of region 2
+  d2 = ((ry * ry) * ((x + 0.5) * (x + 0.5))) +
+       ((rx * rx) * ((y - 1) * (y - 1))) -
+       (rx * rx * ry * ry);
+
+  // Plotting points of region 2
+  while (y >= 0){
+
+    // Print points based on 4-way symmetry
+    cout << x + xc << " , " << y + yc << endl;
+    cout << -x + xc << " , " << y + yc << endl;
+    cout << x + xc << " , " << -y + yc << endl;
+    cout << -x + xc << " , " << -y + yc << endl;
+
+    // Checking and updating parameter
+    // value based on algorithm
+    if (d2 > 0){
+      y--;
+      dy = dy - (2 * rx * rx);
+      d2 = d2 + (rx * rx) - dy;
+    }
+    else{
+      y--;
+      x++;
+      dx = dx + (2 * ry * ry);
+      dy = dy - (2 * rx * rx);
+      d2 = d2 + dx - dy + (rx * rx);
+    }
+  }
 }
