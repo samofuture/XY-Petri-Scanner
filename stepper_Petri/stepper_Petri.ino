@@ -18,82 +18,32 @@
 Stepper xStepper(200, 8, 9, 10, 11);
 Stepper yStepper(200, 4, 5, 6, 7);   //TODO change ystepper pins
 
+unsigned short int arrSizeY = 28;
+unsigned short int arrSizeX = 40;
+bool grids[28][40];
 
-
-bool grids[38][38];
 
 void setup() {
   
-  Serial.begin(115200);
+  Serial.begin(9600);
 }
 
 int roundUp(double x) {
-  int intX = 1000000 * x;
-  if (intX % 1000000 != 0) {
-    return (intX / 1000000) + 1;
+  short mod = 1000;
+  unsigned int intX = mod *(x);
+  int ret = round(x);
+  if (intX % mod != 0) {
+    ret = (intX / mod) + 1;
+    return ret;
   }
   return intX;
 }
 
 short loopCount = 0;
 
-void midPointCircleDraw(int x_center, int y_center, int r) {
-  int x = r;
-  int y = 0;
-
-  // Printing the initial point on the axes after translation
-  //grids[x_center][y_center] = 1;
-
-  // When radius is zero only a single
-  // point will be printed
-  if (r > 0) {
-    grids[x + x_center][-y + y_center] = 1;
-    grids[y + x_center][x + y_center] = 1;
-    grids[-y + x_center][x + y_center] = 1;
-  }
-
-  // Initialising the value of P
-  int P = 1 - r;
-  while (x > y)
-  {
-    Serial.print("");
-    y++;
-
-    // Mid-point is inside or on the perimeter
-    if (P <= 0)
-      P = P + 2 * y + 1;
-    // Mid-point is outside the perimeter
-    else
-    {
-      x--;
-      P = P + 2 * y - 2 * x + 1;
-    }
-
-    // All the perimeter points have already been printed
-    if (x < y)
-      break;
-
-    // Printing the generated point and its reflection
-    // in the other octants after translation
-    grids[x + x_center][y + y_center] = 1;
-    grids[-x + x_center][y + y_center] = 1;
-    grids[x + x_center][-y + y_center] = 1;
-    grids[-x + x_center][-y + y_center] = 1;
-
-    // If the generated point is on the line x = y then
-    // the perimeter points have already been printed
-    if (x != y) {
-      grids[y + x_center][x + y_center] = 1;
-      grids[-y + x_center][x + y_center] = 1;
-      grids[y + x_center][-x + y_center] = 1;
-      grids[-y + x_center][-x + y_center] = 1;
-    }
-  }
-}
-
 void displayGrids() {
-  for (int i = 0; i < 34; i++) {
-    for (int j = 0; j < 34; j++) {
+  for (int i = 0; i < arrSizeY; i++) {
+    for (int j = 0; j < arrSizeX; j++) {
       Serial.print(String(grids[i][j]) + ", ");
     }
     Serial.println();
@@ -104,15 +54,15 @@ void fillWithTrue() {
   bool checkBeg = 0;
   bool checkMid = 0;
   bool checkSta = 0;
-  for (int i = 0; i < 34; i++) {
-    for (int j = 0; j < 34; j++) {
+  for (int i = 0; i < arrSizeY; i++) {
+    for (int j = 0; j < arrSizeX; j++) {
       if (grids[i][j] && !grids[i][j + 1]) {
         if (checkBeg) {
           checkBeg = 0;
         } else {
           checkBeg = 1;
         }
-      } else if (checkBeg && i != 1 && i != 33) {
+      } else if (checkBeg && i != 1 && i != arrSizeY-1) {
         grids[i][j] = 1;
       }
     }
@@ -121,7 +71,7 @@ void fillWithTrue() {
 
 }
 
-int pause = 1000;
+int pause = 1;
 
 
 //Inefficiency in how snake handles lower half of petri dish
@@ -129,47 +79,56 @@ void snake(int snakeSpeed, int spr, double stepX, double stepY) {
   //TODO Add Homing Feature
   int x = 0;
   int y = 0; //Positive y means that it has gone down on the y axis
-  for (int i = 0; i < 34; i++) {
-    if (i % 2 == 1) {
-      while (!grids[i][x]) {
-        moveX(-stepX, snakeSpeed, spr);
-        x--;
+  bool check = false;
+  for (int i = 0; i < arrSizeY; i++) {
+    for(int j = 0; j < arrSizeX; j++){
+      if(grids[i][j] == 1){
+        check = true;
+        j = arrSizeX;
       }
-
-      while (x >= 0 && grids[i][x]) {
-        grids[i][x] = 0;
-        delay(pause);
-        moveX(-stepX, snakeSpeed, spr);
-        x--;
-      }
-      if (x - 1 >= 0) {
-        if (x - 2 >= 0) {
+    }
+    if(check){
+      if (i % 2 == 1) {
+        while (!grids[i][x]) {
           moveX(-stepX, snakeSpeed, spr);
           x--;
         }
-        moveX(-stepX, snakeSpeed, spr);
-        x--;
-      }
-
-    } else {
-      while (!grids[i][x]) {
-        moveX(stepX, snakeSpeed, spr);
-        x++;
-      }
-
-      while (x < 34 && grids[i][x]) {
-        grids[i][x] = 0;
-        delay(pause);
-        moveX(stepX, snakeSpeed, spr);
-        x++;
-      }
-      if (x + 1 < 34) {
-        if (x + 2 < 34) {
+  
+        while (x >= 0 && grids[i][x]) {
+          grids[i][x] = 0;
+          delay(pause);
+          moveX(-stepX, snakeSpeed, spr);
+          x--;
+        }
+        if (x - 1 >= 0) {
+          if (x - 2 >= 0) {
+            moveX(-stepX, snakeSpeed, spr);
+            x--;
+          }
+          moveX(-stepX, snakeSpeed, spr);
+          x--;
+        }
+  
+      } else {
+        while (!grids[i][x]) {
           moveX(stepX, snakeSpeed, spr);
           x++;
         }
-        moveX(stepX, snakeSpeed, spr);
-        x++;
+  
+        while (x < arrSizeX && grids[i][x]) {
+          grids[i][x] = 0;
+          delay(pause);
+          moveX(stepX, snakeSpeed, spr);
+          x++;
+        }
+        if (x + 1 < arrSizeX) {
+          if (x + 2 < arrSizeX) {
+            moveX(stepX, snakeSpeed, spr);
+            x++;
+          }
+          moveX(stepX, snakeSpeed, spr);
+          x++;
+        }
       }
     }
     moveY(-stepY, snakeSpeed, spr);
@@ -184,34 +143,35 @@ double roundToMin(double x){
   return x;
 }
 
-double revolutionsPerMM = 5; //D5epends on thread size (pitch), how many times the motor must rotate to move one mm
+double revolutionsPerMM = 5; //Depends on thread size (pitch), how many times the motor must rotate to move one mm
 
 void loop() {
-  const int moveOnceSpeed = 50; //speed of stepper motor, % from 0-100
-  const int stepsPerRevolution = 200;
-  const double gridSizeX = 2.172;           //size of the length (X) of a grid square in mm
-  const double gridSizeY = 1.577;           //size of the length (Y) of a grid square in mm
+  const short int moveOnceSpeed = 100; //speed of stepper motor, % from 0-100
+  const short int stepsPerRevolution = 200;
+  const double gridSizeX = 1.86; //2.172;           //size of the length (X) of a grid square in mm
+  const double gridSizeY = 1.351; //1.577;           //size of the length (Y) of a grid square in mm
   const int sizeOfPetri = 50;               //diameter of petri dish in mm
-  int center = roundUp(sizeof(grids) / 2);   //Center of grids
-
+  
+  int centerX = (arrSizeY / 2);             //Center of grids
+  int centerY = (arrSizeX / 2);
+  
   double xSize = roundToMin(gridSizeX);
   double ySize = roundToMin(gridSizeY);
-  int xRadius = roundUp(sizeOfPetri / xSize);
-  int yRadius = roundUp(sizeOfPetri / ySize);
+  Serial.println("CenterX: " + String(centerX));
+  Serial.println("CenterY: " + String(centerY));
   //0,0 cant be center of circle
   if (loopCount == 0) {
-    midPointCircleDraw(center, center, center);
-    grids[17][1] = 1;
-    grids[1][17] = 1;
+    double temp = sizeOfPetri / xSize;
+    short int tempX = roundUp(temp) / 2;
+    temp = sizeOfPetri / ySize;
+    short int tempY = roundUp(temp) / 2;
 
-//    if(max(xRadius, yRadius) == xRadius){
-//      drawEllipse(xRadius, yRadius, center, center);
-//    }
+    drawEllipse(tempX, tempY, centerX, centerY);
     
     fillWithTrue();
     displayGrids();
 
-    snake(moveOnceSpeed, stepsPerRevolution, 1.5, 2);
+    snake(moveOnceSpeed, stepsPerRevolution, gridSizeX, gridSizeY);
 
     displayGrids();
 
