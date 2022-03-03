@@ -71,7 +71,18 @@ void fillWithTrue() {
 
 }
 
-int pause = 1;
+//void goHome(int spr){
+//  bool isHome = false;
+//  bool isHomeX = false;
+//  bool isHomeY = false;
+//  while(!isHome){
+//    if(!isHomeX){
+//      moveX(1, 75, spr)
+//    }
+//  }
+//}
+
+int pause = 1000;
 
 
 //Inefficiency in how snake handles lower half of petri dish
