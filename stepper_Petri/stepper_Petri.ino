@@ -57,11 +57,11 @@ unsigned short int camLocation;
 
 short loopCount = 0;
 
-short unsigned int pause = 1500;
+short unsigned int pause = 0;
 
 void setup() {
 
-  Serial.begin(9600);
+  Serial.begin(38400);
 
   //Limit Switch Pin Setup
   pinMode(switchPinX, INPUT);
@@ -90,23 +90,56 @@ void setup() {
 
 }
 
+void loop() {
+  readStates();
+  const double gridSizeX = 1.86; //2.172;           //size of the length (X) of a grid square in mm
+  const double gridSizeY = 1.351; //1.577;           //size of the length (Y) of a grid square in mm
+  const int sizeOfPetri = 50;               //diameter of petri dish in mm
+
+  int centerX = (arrSizeY / 2);             //Center of grids
+  int centerY = (arrSizeX / 2);
+
+  double xSize = (gridSizeX);
+  double ySize = (gridSizeY);
+
+  //0,0 cant be center of circle
+  if (loopCount == 0) {
+    if(digitalRead(sizePin) == HIGH){
+      stepX = 1.577;
+      stepY = 2.172;
+    }
+    
+    double temp = sizeOfPetri / xSize;
+    short int tempX = roundUp(temp) / 2;
+    temp = sizeOfPetri / ySize;
+    short int tempY = roundUp(temp) / 2;
+
+    drawEllipse(tempX, tempY, centerX, centerY);
+
+    fillWithTrue();
+    displayGrids();
+
+    snake();
+    Serial.println("After Snake:");
+    displayGrids();
+
+    loopCount++;
+  }
+
+}
+
 void readStates() {
   stateX = digitalRead(switchPinX);
   stateY = digitalRead(switchPinY);
   stateP = digitalRead(pausePin);
 }
 
-long distanceToSteps(double distance) {
-  int pitch = 5;        //pitch of lead screw (5 mm)
-  double temp = distance / pitch;
-  temp = temp * stepsPerRevolution;
-  long ret = round(temp);
-  return ret;
-}
+
+//Movement Functions
 
 bool homePetri() {
   readStates();
-  //While x and y switches are not pressed and pause switch is on
+  //While the x or y switches are not pressed and pause switch is on
   while ( (stateX == LOW || stateY == LOW) && stateP == HIGH) {
     //decrement position until the limit switch is hit
     if (stateX != HIGH)
@@ -124,28 +157,86 @@ bool homePetri() {
   return true;
 }
 
-int roundUp(double x) {
-  short mod = 1000;
-  unsigned int intX = mod * (x);
-  int ret = round(x);
-  if (intX % mod != 0) {
-    ret = (intX / mod) + 1;
-    return ret;
-  }
-  return intX;
-}
+//Assumed that camera is in top right of the petri dish array (grids[arrSizeX][arrSizeY])
+void snake() {
+  readStates();
 
+  //grids[y][x]
+  for (int y = 0; y < arrSizeY; y++) {
+    //0 is the top of the array
+    bool checkRow = false;
+    int tempX = 0;
+    //If the camera is on the right half of the petri dish
+    if (pos[0] > (distanceToSteps(arrSizeX) / 2) ) {
+      for (int x = arrSizeX - 1; x >= 0; x--) {
+        
+        if (!checkRow) {
+          int temp = x;
+          //Checks the row to make sure that it isn't empty
+          while (temp >= 0 && !checkRow) {
+            if (grids[y][temp]) {
+              checkRow = true;
+            }
+            temp--;
+          }
+          if(checkRow)
+            x = temp;
+        }
+        if(grids[y][x]){
+          grids[y][x] = 0;
+          //Moves to the next available position
+          pos[0] = distanceToSteps(x * stepX);
+          steppers.moveTo(pos);
+          delay(pause);
+          readStates();
+          while(stateP == LOW){
+            readStates();
+          }
+          tempX = x - 1;
+        }
+      }
+    }else{  //If camera is on left side of the petri dish
 
-
-void displayGrids() {
-  for (int i = 0; i < arrSizeY; i++) {
-    for (int j = 0; j < arrSizeX; j++) {
-      Serial.print(String(grids[i][j]) + ", ");
+      for(int x = 0; x < arrSizeX; x++){
+        if(!checkRow){
+          int temp = x;
+          while(temp < arrSizeX && !checkRow){
+            if(grids[y][temp]){
+              checkRow = true;
+            }
+            temp++;
+          }
+          if(checkRow)
+            x = temp;
+        }
+        if(grids[y][x]){
+          grids[y][x] = 0;
+          
+          pos[0] = distanceToSteps(x * stepX);
+          steppers.moveTo(pos);
+          delay(pause);
+          
+          readStates();
+          while(stateP == LOW){
+            readStates();
+          }
+          tempX = x + 1;
+        }
+      }
     }
-    Serial.println();
+    grids[y][tempX] = 0;
+    pos[1] = distanceToSteps((arrSizeY - y) * stepY);
+    steppers.moveTo(pos);
+    delay(pause);
+    
+    readStates();
+    while(stateP == LOW){
+      readStates();
+    }
   }
 }
 
+//Fills in the ellipse with true
 void fillWithTrue() {
   bool checkBeg = 0;
   bool checkMid = 0;
@@ -167,121 +258,33 @@ void fillWithTrue() {
 
 }
 
+//Custom Math Functions
 
-//Write code
-//Machine can only move to an accuracy of so much, round grid square size up to match tolerance
-double roundToMin(double x) {
-  return x;
+long distanceToSteps(double distance) {
+  int pitch = 5;        //pitch of lead screw (5 mm)
+  double temp = distance / pitch;
+  temp = temp * stepsPerRevolution;
+  long ret = round(temp);
+  return ret;
 }
 
-void loop() {
-  const double gridSizeX = 1.86; //2.172;           //size of the length (X) of a grid square in mm
-  const double gridSizeY = 1.351; //1.577;           //size of the length (Y) of a grid square in mm
-  const int sizeOfPetri = 50;               //diameter of petri dish in mm
-
-  int centerX = (arrSizeY / 2);             //Center of grids
-  int centerY = (arrSizeX / 2);
-
-  double xSize = roundToMin(gridSizeX);
-  double ySize = roundToMin(gridSizeY);
-  Serial.println("CenterX: " + String(centerX));
-  Serial.println("CenterY: " + String(centerY));
-  //0,0 cant be center of circle
-  if (loopCount == 0) {
-    if(digitalRead(sizePin) == HIGH){
-      stepX = 1.577;
-      stepY = 2.172;
-    }
-    
-    double temp = sizeOfPetri / xSize;
-    short int tempX = roundUp(temp) / 2;
-    temp = sizeOfPetri / ySize;
-    short int tempY = roundUp(temp) / 2;
-
-    drawEllipse(tempX, tempY, centerX, centerY);
-
-    fillWithTrue();
-    displayGrids();
-
-    snake();
-
-    displayGrids();
-
-    loopCount++;
+int roundUp(double x) {
+  short mod = 1000;
+  unsigned int intX = mod * (x);
+  int ret = round(x);
+  if (intX % mod != 0) {
+    ret = (intX / mod) + 1;
+    return ret;
   }
-
+  return intX;
 }
 
-//Assumed that camera is in top right of the petri dish array (grids[arrSizeX][arrSizeY])
-void snake() {
-  readStates();
-
-  //grids[y][x]
-  for (int y = 0; y < arrSizeY; y++) {
-    //0 is the top of the array
-    bool checkRow = false;
-    
-    //If the camera is on the right half of the petri dish
-    if (pos[0] > (distanceToSteps(arrSizeX) / 2) ) {
-      for (int x = arrSizeX - 1; x >= 0; x--) {
-        
-        if (!checkRow) {
-          int temp = x;
-          //Checks the row to make sure that it isn't empty
-          while (temp >= 0 && !checkRow) {
-            if (grids[y][temp]) {
-              checkRow = true;
-            }
-            temp--;
-          }
-          if(checkRow)
-            x = temp;
-        }
-        grids[y][x] = 0;
-        //Moves to the next available position
-        pos[0] = distanceToSteps(x * stepX);
-        steppers.moveTo(pos);
-        delay(pause);
-        readStates();
-        while(stateP == LOW){
-          readStates();
-        }
-      }
-    }else{  //If camera is on left side of the petri dish
-
-      for(int x = 0; x < arrSizeX; x++){
-        if(!checkRow){
-          int temp = x;
-          while(temp < arrSizeX && !checkRow){
-            if(grids[y][temp]){
-              checkRow = true;
-            }
-            temp++;
-          }
-          if(checkRow)
-            x = temp;
-        }
-        grids[y][x] = 0;
-        
-        pos[0] = distanceToSteps(x * stepX);
-        steppers.moveTo(pos);
-        delay(pause);
-        
-        readStates();
-        while(stateP == LOW){
-          readStates();
-        }
-      }
+void displayGrids() {
+  for (int i = 0; i < arrSizeY; i++) {
+    for (int j = 0; j < arrSizeX; j++) {
+      Serial.print(String(grids[i][j]) + ", ");
     }
-    
-    pos[1] = distanceToSteps((arrSizeY - y) * stepY);
-    steppers.moveTo(pos);
-    delay(pause);
-    
-    readStates();
-    while(stateP == LOW){
-      readStates();
-    }
+    Serial.println();
   }
 }
 
