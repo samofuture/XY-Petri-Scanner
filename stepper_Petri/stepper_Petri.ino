@@ -7,7 +7,6 @@
 */
 
 #include <AccelStepper.h>
-#include <MultiStepper.h>
 
 //Pins for stepper drivers
 #define dirPinX 2
@@ -22,7 +21,7 @@
 int stateX = 0;
 int stateY = 0;
 
-//Pause Switch
+// Switch
 #define pausePin 10
 
 int stateP = 0;
@@ -37,6 +36,8 @@ double stepY = 1.86;
 
 const int stepsPerRevolution = 200;
 
+#define SPEED 200
+
 //Position in steps, pos[0] = x, pos[1] = y
 long pos[] = {0, 0};
 
@@ -46,7 +47,6 @@ long pos[] = {0, 0};
 AccelStepper xStepper(AccelStepper::DRIVER, stepPinX, dirPinX);
 AccelStepper yStepper(AccelStepper::DRIVER, stepPinY, dirPinY);
 
-MultiStepper steppers;
 
 const unsigned short int arrSizeY = 28;
 const unsigned short int arrSizeX = 40;
@@ -57,11 +57,11 @@ unsigned short int camLocation;
 
 short loopCount = 0;
 
-short unsigned int pause = 0;
+short unsigned int pause = 500;
 
 void setup() {
 
-  Serial.begin(38400);
+  Serial.begin(9600);
 
   //Limit Switch Pin Setup
   pinMode(switchPinX, INPUT);
@@ -74,19 +74,19 @@ void setup() {
   pinMode(sizePin, INPUT);
 
   //Set Max Speeds for the steppers (max steps per second)
-  xStepper.setMaxSpeed(200);
-  yStepper.setMaxSpeed(200);
+  xStepper.setMaxSpeed(500);
+  yStepper.setMaxSpeed(500);
 
-  steppers.addStepper(xStepper);
-  steppers.addStepper(yStepper);
+  xStepper.setAcceleration(20);
+  yStepper.setAcceleration(20);
 
   camLocation = distanceToSteps(75);
   
   //Home the petri dish to 0, 0
-  bool isHome = false;
-  while (!isHome) {
-    isHome = homePetri();
-  }
+//  bool isHome = false;
+//  while (!isHome) {
+//    isHome = homePetri();
+//  }
 
 }
 
@@ -128,6 +128,10 @@ void loop() {
 
 }
 
+/* readStates updates the positions of the switches
+ * Parameters: None
+ * Returns void
+ */
 void readStates() {
   stateX = digitalRead(switchPinX);
   stateY = digitalRead(switchPinY);
@@ -137,6 +141,10 @@ void readStates() {
 
 //Movement Functions
 
+/* homePetri moves stepper motors to the home position
+ * Parameters: None
+ * Returns boolean (true if it is at home)
+ */
 bool homePetri() {
   readStates();
   //While the x or y switches are not pressed and pause switch is on
@@ -147,7 +155,7 @@ bool homePetri() {
     if (stateY != HIGH)
       pos[1]--;
 
-    steppers.moveTo(pos);
+//    steppers.moveTo(pos);
     readStates();
   }
   pos[0] = distanceToSteps(camLocation);
@@ -157,7 +165,46 @@ bool homePetri() {
   return true;
 }
 
+/* MoveX / MoveY moves the corresponding stepper motor to a step position
+ * Parameters: long steps, the desired position of the stepper motor
+ * Returns void
+ */
+void moveX(long steps){
+//  Serial.println("(X) Moving to: " + String(steps) );
+  xStepper.setCurrentPosition(pos[0]);
+  while(xStepper.currentPosition() != steps){
+    if(steps < pos[0]){
+      xStepper.setSpeed(-SPEED);
+    }else{
+      xStepper.setSpeed(SPEED);
+    }
+    xStepper.runSpeed();
+  }
+}
+void moveY(long steps){
+//  Serial.println("(Y) Moving to: " + String(steps) );
+  yStepper.setCurrentPosition(pos[1]);
+  while(yStepper.currentPosition() != steps){
+    if(steps < pos[1]){
+      yStepper.setSpeed(-SPEED);
+    }else{
+      yStepper.setSpeed(SPEED);
+    }
+    yStepper.runSpeed();
+  }
+}
+
+/* wait
+ * 
+ */
+void wait(){
+  
+}
 //Assumed that camera is in top right of the petri dish array (grids[arrSizeX][arrSizeY])
+/* snake moves the petri dish through the grid of squares in a snake like fashion (through one row, then move down a column, repeat)
+ * Parameters: None
+ * Returns void
+ */
 void snake() {
   readStates();
 
@@ -185,8 +232,9 @@ void snake() {
         if(grids[y][x]){
           grids[y][x] = 0;
           //Moves to the next available position
-          pos[0] = distanceToSteps(x * stepX);
-          steppers.moveTo(pos);
+          long temp = distanceToSteps(x * stepX);
+          moveX(temp);
+          pos[0] = temp;
           delay(pause);
           readStates();
           while(stateP == LOW){
@@ -212,8 +260,9 @@ void snake() {
         if(grids[y][x]){
           grids[y][x] = 0;
           
-          pos[0] = distanceToSteps(x * stepX);
-          steppers.moveTo(pos);
+          long temp = distanceToSteps(x * stepX);
+          moveX(temp);
+          pos[0] = temp;
           delay(pause);
           
           readStates();
@@ -225,8 +274,9 @@ void snake() {
       }
     }
     grids[y][tempX] = 0;
-    pos[1] = distanceToSteps((arrSizeY - y) * stepY);
-    steppers.moveTo(pos);
+    long temp = distanceToSteps((arrSizeY - y) * stepY);
+    moveY(temp);
+    pos[1] = temp;
     delay(pause);
     
     readStates();
