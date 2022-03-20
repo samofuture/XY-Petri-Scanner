@@ -36,7 +36,10 @@ double stepY = 1.86;
 
 const int stepsPerRevolution = 200;
 
-#define SPEED 200
+#define SPEED 200 //Steps per second
+
+#define sleepPinX 13
+#define sleepPinY 14
 
 //Position in steps, pos[0] = x, pos[1] = y
 long pos[] = {0, 0};
@@ -73,6 +76,13 @@ void setup() {
   //Grid Size Switch Setup
   pinMode(sizePin, INPUT);
 
+  //Sleep Pin Setup
+  pinMode(sleepPinX, OUTPUT);
+  pinMode(sleepPinY, OUTPUT);
+  
+  digitalWrite(sleepPinX, HIGH);
+  digitalWrite(sleepPinY, HIGH);
+
   //Set Max Speeds for the steppers (max steps per second)
   xStepper.setMaxSpeed(500);
   yStepper.setMaxSpeed(500);
@@ -83,17 +93,17 @@ void setup() {
   camLocation = distanceToSteps(75);
   
   //Home the petri dish to 0, 0
-//  bool isHome = false;
-//  while (!isHome) {
-//    isHome = homePetri();
-//  }
+  bool isHome = false;
+  while (!isHome) {
+    isHome = homePetri();
+  }
 
 }
 
 void loop() {
   readStates();
-  const double gridSizeX = 1.86; //2.172;           //size of the length (X) of a grid square in mm
-  const double gridSizeY = 1.351; //1.577;           //size of the length (Y) of a grid square in mm
+  const double gridSizeY = 1.86; //2.172;           //size of the length (X) of a grid square in mm
+  const double gridSizeX = 1.351; //1.577;           //size of the length (Y) of a grid square in mm
   const int sizeOfPetri = 50;               //diameter of petri dish in mm
 
   int centerX = (arrSizeY / 2);             //Center of grids
@@ -107,6 +117,8 @@ void loop() {
     if(digitalRead(sizePin) == HIGH){
       stepX = 1.577;
       stepY = 2.172;
+      xSize = stepX;
+      ySize = stepY;
     }
     
     double temp = sizeOfPetri / xSize;
@@ -147,19 +159,48 @@ void readStates() {
  */
 bool homePetri() {
   readStates();
-  //While the x or y switches are not pressed and pause switch is on
-  while ( (stateX == LOW || stateY == LOW) && stateP == HIGH) {
-    //decrement position until the limit switch is hit
-    if (stateX != HIGH)
-      pos[0]--;
-    if (stateY != HIGH)
-      pos[1]--;
-
-//    steppers.moveTo(pos);
+  while(stateP == LOW){
     readStates();
   }
+  xStepper.setCurrentPosition(0);
+  yStepper.setCurrentPosition(0);
+  
+  //While the x or y switches are not pressed
+  while (stateX == LOW || stateY == LOW) {
+    //decrement position until the limit switch is hit
+    long tempX, tempY;
+    if (stateX != HIGH)
+      tempX = pos[0] - 1;
+    if (stateY != HIGH)
+      tempY = pos[1] - 1;
+
+    //Move both x and y steppers simultaneously
+    while(xStepper.currentPosition() != tempX && yStepper.currentPosition() != tempY){
+      if(tempX < pos[0]){
+        xStepper.setSpeed(-SPEED);
+      }else{
+        xStepper.setSpeed(SPEED);
+      }
+      if(tempY < pos[0]){
+        yStepper.setSpeed(-SPEED);
+      }else{
+        yStepper.setSpeed(SPEED);
+      }
+    }
+
+    //If x or y gets home before the other one
+    if(stateY != HIGH)
+      moveY(tempY);
+    if(stateX != HIGH)
+      moveX(tempX);
+      
+    readStates();
+    while(stateP == LOW){
+      readStates();
+    }
+  }
   pos[0] = distanceToSteps(camLocation);
-  pos[1] = distanceToSteps(camLocation);
+  pos[1] = distanceToSteps(0);
   xStepper.setCurrentPosition(pos[0]);
   yStepper.setCurrentPosition(pos[1]);
   return true;
@@ -195,11 +236,22 @@ void moveY(long steps){
 }
 
 /* wait
- * 
+ * Parameters: char axis (which motor is being paused)
+ * Returns void
  */
-void wait(){
-  
+void wait(char axis){
+  if(axis == 'X'){
+    digitalWrite(sleepPinX, LOW);
+  }else if(axis == 'Y'){
+    digitalWrite(sleepPinY, LOW);
+  }
+  delay(pause);
+  if(axis == 'X'){
+    digitalWrite(sleepPinX, HIGH);
+    delay(3);                        //delay for DRV8825 to wake back up
+  }
 }
+
 //Assumed that camera is in top right of the petri dish array (grids[arrSizeX][arrSizeY])
 /* snake moves the petri dish through the grid of squares in a snake like fashion (through one row, then move down a column, repeat)
  * Parameters: None
@@ -235,7 +287,7 @@ void snake() {
           long temp = distanceToSteps(x * stepX);
           moveX(temp);
           pos[0] = temp;
-          delay(pause);
+          wait('X');
           readStates();
           while(stateP == LOW){
             readStates();
@@ -263,8 +315,7 @@ void snake() {
           long temp = distanceToSteps(x * stepX);
           moveX(temp);
           pos[0] = temp;
-          delay(pause);
-          
+          wait('X');          
           readStates();
           while(stateP == LOW){
             readStates();
@@ -275,9 +326,12 @@ void snake() {
     }
     grids[y][tempX] = 0;
     long temp = distanceToSteps((arrSizeY - y) * stepY);
+    digitalWrite(sleepPinY, HIGH);
+    delay(3);
+    
     moveY(temp);
     pos[1] = temp;
-    delay(pause);
+    wait('Y');
     
     readStates();
     while(stateP == LOW){
@@ -286,7 +340,10 @@ void snake() {
   }
 }
 
-//Fills in the ellipse with true
+/*  fillWithTrue Fills in the ellipse with true
+ *  Parameters: none
+ *  Returns none
+ */
 void fillWithTrue() {
   bool checkBeg = 0;
   bool checkMid = 0;
@@ -310,6 +367,10 @@ void fillWithTrue() {
 
 //Custom Math Functions
 
+/* distanceToSteps calculates the steps to take with a given distance
+ * Parameters: double distance (the distance in mm)
+ * Returns long (number of steps to move the distance)
+ */
 long distanceToSteps(double distance) {
   int pitch = 5;        //pitch of lead screw (5 mm)
   double temp = distance / pitch;
@@ -318,6 +379,10 @@ long distanceToSteps(double distance) {
   return ret;
 }
 
+/* roundUp rounds a double up to the next int
+ * Parameters: double x (value to be rounded up)
+ * Returns int (rounded value)
+ */
 int roundUp(double x) {
   short mod = 1000;
   unsigned int intX = mod * (x);
@@ -329,17 +394,10 @@ int roundUp(double x) {
   return intX;
 }
 
-void displayGrids() {
-  for (int i = 0; i < arrSizeY; i++) {
-    for (int j = 0; j < arrSizeX; j++) {
-      Serial.print(String(grids[i][j]) + ", ");
-    }
-    Serial.println();
-  }
-}
-
-//Draw Ellipse for Petri Dish
-//Major Radius, Minor Radius, Center Coordinates
+/* drawEllipse draws an ellipse on a grid of boolean values
+ * Parameters: int rx (major radius), int ry (minor radius), int x_center, int y_center (center of the ellipse coordinates)
+ * Returns void
+ */
 void drawEllipse(int rx, int ry, int x_center, int y_center) {
 
   float dx, dy, d1, d2;
@@ -404,5 +462,18 @@ void drawEllipse(int rx, int ry, int x_center, int y_center) {
       dy = dy - (2 * rx * rx);
       d2 = d2 + dx - dy + (rx * rx);
     }
+  }
+}
+
+/* displayGrids displays the grid
+ * Parameters: none
+ * Returns void
+ */
+void displayGrids() {
+  for (int i = 0; i < arrSizeY; i++) {
+    for (int j = 0; j < arrSizeX; j++) {
+      Serial.print(String(grids[i][j]) + ", ");
+    }
+    Serial.println();
   }
 }
