@@ -22,24 +22,24 @@ int stateX = 0;
 int stateY = 0;
 
 // Switch
-#define pausePin 10
+#define pausePin 9
 
 int stateP = 0;
 
 //Size Switch
 //On = Bigger Grid Size [2.172, 1.577], Off = Smaller Grid Size[1.86, 1.351]
-#define sizePin 11
+#define sizePin 10
 
 //Defaults to smaller size
 double stepX = 1.351;
 double stepY = 1.86;
 
-const int stepsPerRevolution = 200;
+#define stepsPerRevolution 200
 
 #define SPEED 200 //Steps per second
 
-#define sleepPinX 13
-#define sleepPinY 14
+#define sleepPinX 12
+#define sleepPinY 13
 
 //Position in steps, pos[0] = x, pos[1] = y
 long pos[] = {0, 0};
@@ -60,11 +60,11 @@ unsigned short int camLocation;
 
 short loopCount = 0;
 
-short unsigned int pause = 500;
+#define pause 2000
 
 void setup() {
 
-  Serial.begin(9600);
+  Serial.begin(115200);
 
   //Limit Switch Pin Setup
   pinMode(switchPinX, INPUT);
@@ -94,9 +94,11 @@ void setup() {
   
   //Home the petri dish to 0, 0
   bool isHome = false;
-  while (!isHome) {
-    isHome = homePetri();
-  }
+//  while (!isHome) {
+//    isHome = homePetri();
+//    Serial.println("Not Home");
+//  }
+//  Serial.println("Is Home");
 
 }
 
@@ -134,7 +136,7 @@ void loop() {
     snake();
     Serial.println("After Snake:");
     displayGrids();
-
+    digitalWrite(sleepPinX, LOW);
     loopCount++;
   }
 
@@ -157,6 +159,10 @@ void readStates() {
  * Parameters: None
  * Returns boolean (true if it is at home)
  */
+
+#define gap 5       //Distance in mm that the thing has to be before it stops pressing limit switch 
+#define fineTune 2  //Number of steps for the fine tuning
+ 
 bool homePetri() {
   readStates();
   while(stateP == LOW){
@@ -164,42 +170,73 @@ bool homePetri() {
   }
   xStepper.setCurrentPosition(0);
   yStepper.setCurrentPosition(0);
-  
-  //While the x or y switches are not pressed
-  while (stateX == LOW || stateY == LOW) {
-    //decrement position until the limit switch is hit
-    long tempX, tempY;
-    if (stateX != HIGH)
-      tempX = pos[0] - 1;
-    if (stateY != HIGH)
-      tempY = pos[1] - 1;
+//  Serial.println("Before Checking Switches");
 
-    //Move both x and y steppers simultaneously
-    while(xStepper.currentPosition() != tempX && yStepper.currentPosition() != tempY){
-      if(tempX < pos[0]){
-        xStepper.setSpeed(-SPEED);
-      }else{
-        xStepper.setSpeed(SPEED);
-      }
-      if(tempY < pos[0]){
-        yStepper.setSpeed(-SPEED);
-      }else{
-        yStepper.setSpeed(SPEED);
-      }
-    }
-
-    //If x or y gets home before the other one
-    if(stateY != HIGH)
-      moveY(tempY);
-    if(stateX != HIGH)
-      moveX(tempX);
-      
-    readStates();
-    while(stateP == LOW){
+  //Initial Move to limit switch
+  while (stateX != LOW) {
+    long temp = pos[0] - distanceToSteps(1);
+    moveX(temp);
+    digitalWrite(sleepPinX, LOW);
+    pos[0] = temp;
+    do{
       readStates();
-    }
+    }while(stateP == LOW);
+    digitalWrite(sleepPinX, HIGH);
+    delay(5);
   }
-  pos[0] = distanceToSteps(camLocation);
+  
+  //Move to reset the limit switch
+  long tempGap = pos[0] + distanceToSteps(gap);
+  moveX(tempGap);
+  pos[0] = tempGap;
+  
+  //Move Slower to fine tune hitting the limit switch
+  while (stateX != LOW) {
+    long temp = pos[0] - fineTune;
+    moveX(temp);
+    digitalWrite(sleepPinX, LOW);
+    pos[0] = temp;
+    do{
+      readStates();
+    }while(stateP == LOW);
+    digitalWrite(sleepPinX, HIGH);
+    delay(5);
+  }
+  
+  //Y Homing
+  
+  //Initial Move to limit switch
+  while (stateY != LOW) {
+    long temp = pos[1] - distanceToSteps(1);
+    moveY(temp);
+    digitalWrite(sleepPinY, LOW);
+    pos[1] = temp;
+    do{
+      readStates();
+    }while(stateP == LOW);
+    digitalWrite(sleepPinY, HIGH);
+    delay(5);
+  }
+  
+  //Move to reset the limit switch
+  tempGap = pos[1] + distanceToSteps(gap);
+  moveY(tempGap);
+  pos[1] = tempGap;
+  
+  //Move Slower to fine tune hitting the limit switch
+  while (stateY != LOW) {
+    long temp = pos[1] - fineTune;
+    moveY(temp);
+    digitalWrite(sleepPinY, LOW);
+    pos[1] = temp;
+    do{
+      readStates();
+    }while(stateP == LOW);
+    digitalWrite(sleepPinY, HIGH);
+    delay(5);
+  }
+
+  pos[0] = distanceToSteps(0);
   pos[1] = distanceToSteps(0);
   xStepper.setCurrentPosition(pos[0]);
   yStepper.setCurrentPosition(pos[1]);
@@ -248,7 +285,7 @@ void wait(char axis){
   delay(pause);
   if(axis == 'X'){
     digitalWrite(sleepPinX, HIGH);
-    delay(3);                        //delay for DRV8825 to wake back up
+    delay(5);                        //delay for DRV8825 to wake back up
   }
 }
 
@@ -259,84 +296,66 @@ void wait(char axis){
  */
 void snake() {
   readStates();
-
-  //grids[y][x]
-  for (int y = 0; y < arrSizeY; y++) {
-    //0 is the top of the array
-    bool checkRow = false;
+  while(stateP == LOW){
+    readStates();
+  }
+  
+  long xSteps = distanceToSteps(stepX);
+  long ySteps = distanceToSteps(stepY);
+  double halfX = xSteps * arrSizeX / 2;
+  
+  for(int y = 0; y < arrSizeY; y++){
+    //Check if there is a searchable grid in the row, and checks for what side of the dish it is on
+    bool validRow = false;
     int tempX = 0;
-    //If the camera is on the right half of the petri dish
-    if (pos[0] > (distanceToSteps(arrSizeX) / 2) ) {
-      for (int x = arrSizeX - 1; x >= 0; x--) {
-        
-        if (!checkRow) {
-          int temp = x;
-          //Checks the row to make sure that it isn't empty
-          while (temp >= 0 && !checkRow) {
-            if (grids[y][temp]) {
-              checkRow = true;
-            }
-            temp--;
-          }
-          if(checkRow)
-            x = temp;
-        }
-        if(grids[y][x]){
-          grids[y][x] = 0;
-          //Moves to the next available position
-          long temp = distanceToSteps(x * stepX);
+    if(pos[0] < halfX){
+      while(tempX < arrSizeX && !grids[y][tempX]){
+        tempX++;
+      }
+    }else{
+      tempX = arrSizeX - 1;
+      while(tempX >= 0 && !grids[y][tempX]){
+        tempX--;
+      }
+    }
+    if(grids[y][tempX]){
+      validRow = true;
+    }
+    
+    if (validRow) {
+      //Move to where tempX is
+      pos[0] = tempX * xSteps;
+      moveX(pos[0]);
+      wait('X');
+      if (tempX < arrSizeX / 2){
+        //Move right through the row
+        while(tempX < arrSizeX && grids[y][tempX]){
+          Serial.println("Move Right");
+          long temp = pos[0] + xSteps;
           moveX(temp);
           pos[0] = temp;
           wait('X');
-          readStates();
-          while(stateP == LOW){
-            readStates();
-          }
-          tempX = x - 1;
+          tempX++;
         }
-      }
-    }else{  //If camera is on left side of the petri dish
-
-      for(int x = 0; x < arrSizeX; x++){
-        if(!checkRow){
-          int temp = x;
-          while(temp < arrSizeX && !checkRow){
-            if(grids[y][temp]){
-              checkRow = true;
-            }
-            temp++;
-          }
-          if(checkRow)
-            x = temp;
-        }
-        if(grids[y][x]){
-          grids[y][x] = 0;
-          
-          long temp = distanceToSteps(x * stepX);
+      } else{        
+        //Move left through the row
+        while(tempX >= 0 && grids[y][tempX]){
+          Serial.println("Move Left");
+          long temp = pos[0] - xSteps;
           moveX(temp);
           pos[0] = temp;
-          wait('X');          
-          readStates();
-          while(stateP == LOW){
-            readStates();
-          }
-          tempX = x + 1;
+          wait('X');
+          tempX--;
         }
       }
     }
-    grids[y][tempX] = 0;
-    long temp = distanceToSteps((arrSizeY - y) * stepY);
+    //Move Down one row
     digitalWrite(sleepPinY, HIGH);
-    delay(3);
-    
+    delay(5);
+    long temp = pos[1] - ySteps;
     moveY(temp);
     pos[1] = temp;
     wait('Y');
-    
-    readStates();
-    while(stateP == LOW){
-      readStates();
-    }
   }
 }
 
