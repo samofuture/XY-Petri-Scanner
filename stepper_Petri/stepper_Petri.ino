@@ -30,11 +30,12 @@ int stateP = 0;
 //On = Bigger Grid Size [2.172, 1.577], Off = Smaller Grid Size[1.86, 1.351]
 #define sizePin 10
 
-//Defaults to smaller size
-double stepX = 1.351;
-double stepY = 1.86;
+double ySize = (1.351);
+double xSize = (1.86);
 
 #define stepsPerRevolution 200
+
+#define pitch 5
 
 #define SPEED 200 //Steps per second
 
@@ -51,20 +52,21 @@ AccelStepper xStepper(AccelStepper::DRIVER, stepPinX, dirPinX);
 AccelStepper yStepper(AccelStepper::DRIVER, stepPinY, dirPinY);
 
 
-const unsigned short int arrSizeY = 28;
-const unsigned short int arrSizeX = 40;
-bool grids[28][40];
+#define arrSizeY 28
+#define arrSizeX 40
+
+bool grids[arrSizeY][arrSizeX];
 
 //TODO Find where the microscope is
 unsigned short int camLocation;
 
 short loopCount = 0;
 
-#define pause 2000
+#define pause 1250
 
 void setup() {
 
-  Serial.begin(115200);
+  Serial.begin(9600);
 
   //Limit Switch Pin Setup
   pinMode(switchPinX, INPUT);
@@ -104,23 +106,21 @@ void setup() {
 
 void loop() {
   readStates();
-  const double gridSizeY = 1.86; //2.172;           //size of the length (X) of a grid square in mm
-  const double gridSizeX = 1.351; //1.577;           //size of the length (Y) of a grid square in mm
+//  delay(500);
+//  const double gridSizeY = 1.86; //2.172;           //size of the length (X) of a grid square in mm
+//  const double gridSizeX = 1.351; //1.577;           //size of the length (Y) of a grid square in mm
   const int sizeOfPetri = 50;               //diameter of petri dish in mm
 
   int centerX = (arrSizeY / 2);             //Center of grids
   int centerY = (arrSizeX / 2);
 
-  double xSize = (gridSizeX);
-  double ySize = (gridSizeY);
+
 
   //0,0 cant be center of circle
   if (loopCount == 0) {
     if(digitalRead(sizePin) == HIGH){
-      stepX = 1.577;
-      stepY = 2.172;
-      xSize = stepX;
-      ySize = stepY;
+      xSize = 1.577;
+      ySize = 2.172;
     }
     
     double temp = sizeOfPetri / xSize;
@@ -132,9 +132,9 @@ void loop() {
 
     fillWithTrue();
     displayGrids();
-
+        
     snake();
-    Serial.println("After Snake:");
+    Serial.println(F("After Snake:"));
     displayGrids();
     digitalWrite(sleepPinX, LOW);
     loopCount++;
@@ -248,7 +248,7 @@ bool homePetri() {
  * Returns void
  */
 void moveX(long steps){
-//  Serial.println("(X) Moving to: " + String(steps) );
+  Serial.println("(X) Moving to: " + String(steps) );
   xStepper.setCurrentPosition(pos[0]);
   while(xStepper.currentPosition() != steps){
     if(steps < pos[0]){
@@ -260,7 +260,7 @@ void moveX(long steps){
   }
 }
 void moveY(long steps){
-//  Serial.println("(Y) Moving to: " + String(steps) );
+  Serial.println("(Y) Moving to: " + String(steps) );
   yStepper.setCurrentPosition(pos[1]);
   while(yStepper.currentPosition() != steps){
     if(steps < pos[1]){
@@ -300,8 +300,8 @@ void snake() {
     readStates();
   }
   
-  long xSteps = distanceToSteps(stepX);
-  long ySteps = distanceToSteps(stepY);
+  long xSteps = distanceToSteps(ySize);
+  long ySteps = distanceToSteps(xSize);
   double halfX = xSteps * arrSizeX / 2;
   
   for(int y = 0; y < arrSizeY; y++){
@@ -330,21 +330,23 @@ void snake() {
       if (tempX < arrSizeX / 2){
         //Move right through the row
         while(tempX < arrSizeX && grids[y][tempX]){
-          Serial.println("Move Right");
+//          Serial.println(F("Move Right"));
           long temp = pos[0] + xSteps;
           moveX(temp);
           pos[0] = temp;
           wait('X');
+          grids[y][tempX] = false;
           tempX++;
         }
       } else{        
         //Move left through the row
         while(tempX >= 0 && grids[y][tempX]){
-          Serial.println("Move Left");
+//          Serial.println(F("Move Left"));
           long temp = pos[0] - xSteps;
           moveX(temp);
           pos[0] = temp;
           wait('X');
+          grids[y][tempX] = false;
           tempX--;
         }
       }
@@ -391,7 +393,6 @@ void fillWithTrue() {
  * Returns long (number of steps to move the distance)
  */
 long distanceToSteps(double distance) {
-  int pitch = 5;        //pitch of lead screw (5 mm)
   double temp = distance / pitch;
   temp = temp * stepsPerRevolution;
   long ret = round(temp);
@@ -491,7 +492,8 @@ void drawEllipse(int rx, int ry, int x_center, int y_center) {
 void displayGrids() {
   for (int i = 0; i < arrSizeY; i++) {
     for (int j = 0; j < arrSizeX; j++) {
-      Serial.print(String(grids[i][j]) + ", ");
+      String temp = String(grids[i][j]);
+      Serial.print(temp + ", ");
     }
     Serial.println();
   }
