@@ -34,10 +34,11 @@ double ySize = (1.351);
 double xSize = (1.86);
 
 #define stepsPerRevolution 200
+#define microSteps 32
 
 #define pitch 5
 
-#define SPEED 200 //Steps per second
+#define SPEED 3200 //Steps per second
 
 #define sleepPinX 12
 #define sleepPinY 13
@@ -86,21 +87,21 @@ void setup() {
   digitalWrite(sleepPinY, HIGH);
 
   //Set Max Speeds for the steppers (max steps per second)
-  xStepper.setMaxSpeed(500);
-  yStepper.setMaxSpeed(500);
+  xStepper.setMaxSpeed(500 * microSteps);
+  yStepper.setMaxSpeed(500 * microSteps);
 
-  xStepper.setAcceleration(20);
-  yStepper.setAcceleration(20);
+  xStepper.setAcceleration(50 * microSteps);
+  yStepper.setAcceleration(50 * microSteps);
 
   camLocation = distanceToSteps(75);
   
   //Home the petri dish to 0, 0
   bool isHome = false;
-//  while (!isHome) {
-//    isHome = homePetri();
-//    Serial.println("Not Home");
-//  }
-//  Serial.println("Is Home");
+  while (!isHome) {
+    isHome = homePetri();
+    Serial.println(F("Not Home"));
+  }
+  Serial.println(F("Is Home"));
 
 }
 
@@ -169,77 +170,78 @@ bool homePetri() {
     readStates();
   }
   xStepper.setCurrentPosition(0);
+  xStepper.setSpeed(SPEED / 2);
   yStepper.setCurrentPosition(0);
-//  Serial.println("Before Checking Switches");
+  yStepper.setSpeed(SPEED / 2);
+  Serial.println(F("Before Checking Switches"));
+
+  digitalWrite(sleepPinY, LOW);
 
   //Initial Move to limit switch
   while (stateX != LOW) {
-    long temp = pos[0] - distanceToSteps(1);
-    moveX(temp);
-    digitalWrite(sleepPinX, LOW);
-    pos[0] = temp;
+    xStepper.runSpeed();
     do{
       readStates();
     }while(stateP == LOW);
-    digitalWrite(sleepPinX, HIGH);
-    delay(5);
+//    Serial.println(F("Hitting X Switch"));
+    readStates();
   }
-  
+
+
   //Move to reset the limit switch
-  long tempGap = pos[0] + distanceToSteps(gap);
-  moveX(tempGap);
-  pos[0] = tempGap;
+  xStepper.setCurrentPosition(0);
+  long tempGap = -distanceToSteps(gap);
+  xStepper.runToNewPosition(tempGap);
   
   //Move Slower to fine tune hitting the limit switch
   while (stateX != LOW) {
-    long temp = pos[0] - fineTune;
-    moveX(temp);
-    digitalWrite(sleepPinX, LOW);
-    pos[0] = temp;
+    xStepper.runSpeed();
     do{
       readStates();
     }while(stateP == LOW);
-    digitalWrite(sleepPinX, HIGH);
-    delay(5);
+//    Serial.println(F("Hitting X Switch"));
+    readStates();
   }
+
+  digitalWrite(sleepPinX, LOW);
   
   //Y Homing
+
+  digitalWrite(sleepPinY, HIGH);
   
   //Initial Move to limit switch
   while (stateY != LOW) {
-    long temp = pos[1] - distanceToSteps(1);
-    moveY(temp);
-    digitalWrite(sleepPinY, LOW);
-    pos[1] = temp;
+    yStepper.runSpeed();
     do{
       readStates();
     }while(stateP == LOW);
-    digitalWrite(sleepPinY, HIGH);
-    delay(5);
+//    Serial.println(F("Hitting Y Switch"));
+    readStates();
   }
   
   //Move to reset the limit switch
-  tempGap = pos[1] + distanceToSteps(gap);
-  moveY(tempGap);
-  pos[1] = tempGap;
+  yStepper.setCurrentPosition(0);
+  tempGap = -distanceToSteps(gap);
+  yStepper.runToNewPosition(tempGap);
   
   //Move Slower to fine tune hitting the limit switch
   while (stateY != LOW) {
-    long temp = pos[1] - fineTune;
-    moveY(temp);
-    digitalWrite(sleepPinY, LOW);
-    pos[1] = temp;
+    yStepper.runSpeed();
     do{
       readStates();
     }while(stateP == LOW);
-    digitalWrite(sleepPinY, HIGH);
-    delay(5);
+//    Serial.println(F("Hitting Y Switch"));
+    readStates();
   }
 
   pos[0] = distanceToSteps(0);
   pos[1] = distanceToSteps(0);
   xStepper.setCurrentPosition(pos[0]);
   yStepper.setCurrentPosition(pos[1]);
+  
+
+  digitalWrite(sleepPinX, HIGH);
+  
   return true;
 }
 
@@ -296,10 +298,10 @@ void wait(char axis){
  */
 void snake() {
   readStates();
-  while(stateP == LOW){
+  while(stateP != LOW){
     readStates();
   }
-  
+  Serial.println(F("Begin Snake"));
   long xSteps = distanceToSteps(ySize);
   long ySteps = distanceToSteps(xSize);
   double halfX = xSteps * arrSizeX / 2;
@@ -394,7 +396,7 @@ void fillWithTrue() {
  */
 long distanceToSteps(double distance) {
   double temp = distance / pitch;
-  temp = temp * stepsPerRevolution;
+  temp = temp * stepsPerRevolution * microSteps;
   long ret = round(temp);
   return ret;
 }
