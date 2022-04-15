@@ -15,8 +15,8 @@
 #define stepPinY 5
 
 //Limit switch pins for homing
-#define switchPinX 7
-#define switchPinY 8
+#define switchPinY 7
+#define switchPinX 8
 
 int stateX = 0;
 int stateY = 0;
@@ -38,7 +38,7 @@ double xSize = (1.86);
 
 #define pitch 5
 
-#define SPEED 3200 //Steps per second
+#define SPEED 12800 //Steps per second
 
 #define sleepPinX 12
 #define sleepPinY 13
@@ -63,7 +63,7 @@ unsigned short int camLocation;
 
 short loopCount = 0;
 
-#define pause 1250
+#define pause 500
 
 void setup() {
 
@@ -82,16 +82,15 @@ void setup() {
   //Sleep Pin Setup
   pinMode(sleepPinX, OUTPUT);
   pinMode(sleepPinY, OUTPUT);
-  
+
   digitalWrite(sleepPinX, HIGH);
-  digitalWrite(sleepPinY, HIGH);
 
   //Set Max Speeds for the steppers (max steps per second)
   xStepper.setMaxSpeed(500 * microSteps);
   yStepper.setMaxSpeed(500 * microSteps);
 
-  xStepper.setAcceleration(50 * microSteps);
-  yStepper.setAcceleration(50 * microSteps);
+  xStepper.setAcceleration(500 * microSteps);
+  yStepper.setAcceleration(500 * microSteps);
 
   camLocation = distanceToSteps(75);
   
@@ -99,9 +98,12 @@ void setup() {
   bool isHome = false;
   while (!isHome) {
     isHome = homePetri();
-    Serial.println(F("Not Home"));
+//    Serial.println(F("Not Home"));
   }
-  Serial.println(F("Is Home"));
+//  Serial.println(F("Is Home"));
+
+  digitalWrite(sleepPinX, LOW);
+  digitalWrite(sleepPinY, LOW);
 
 }
 
@@ -115,13 +117,18 @@ void loop() {
   int centerX = (arrSizeY / 2);             //Center of grids
   int centerY = (arrSizeX / 2);
 
-
+  bool stateS = false;
 
   //0,0 cant be center of circle
   if (loopCount == 0) {
-    if(digitalRead(sizePin) == HIGH){
-      xSize = 1.577;
-      ySize = 2.172;
+    //Debug switches reading between 0 and 1 when the switch is off
+    for(int i = 0; i < 2000; i++){
+      stateS = digitalRead(sizePin);
+      if(stateS == LOW){
+        i = 2000;
+        xSize = 1.577;
+        ySize = 2.172;
+      }
     }
     
     double temp = sizeOfPetri / xSize;
@@ -150,7 +157,12 @@ void loop() {
 void readStates() {
   stateX = digitalRead(switchPinX);
   stateY = digitalRead(switchPinY);
-  stateP = digitalRead(pausePin);
+  for(int i = 0; i < 2000; i++){
+    stateP = digitalRead(pausePin);
+    if(stateP == LOW){
+      i = 2000;
+    }
+  }
 }
 
 
@@ -161,117 +173,116 @@ void readStates() {
  * Returns boolean (true if it is at home)
  */
 
-#define gap 5       //Distance in mm that the thing has to be before it stops pressing limit switch 
-#define fineTune 2  //Number of steps for the fine tuning
+#define gap 3       //Distance in mm that the thing has to be before it stops pressing limit switch 
  
 bool homePetri() {
+  uint8_t counter = 0;
   readStates();
   while(stateP == LOW){
     readStates();
   }
   xStepper.setCurrentPosition(0);
-  xStepper.setSpeed(SPEED / 2);
+  xStepper.setSpeed(SPEED * 2);
   yStepper.setCurrentPosition(0);
-  yStepper.setSpeed(SPEED / 2);
-  Serial.println(F("Before Checking Switches"));
+  yStepper.setSpeed(-SPEED * 2);
+//  Serial.println(F("Before Checking Switches"));
 
   digitalWrite(sleepPinY, LOW);
 
   //Initial Move to limit switch
-  while (stateX != LOW) {
+//  Serial.println(F("Initial Start"));
+  while (stateX == LOW) {
     xStepper.runSpeed();
-    do{
+    while(stateP == LOW){
       readStates();
-    }while(stateP == LOW);
+    }
 //    Serial.println(F("Hitting X Switch"));
-    readStates();
+    if(counter > 150){
+      readStates();
+      counter = 0;
+    }
+    counter++;
   }
-
-
+  counter = 0;
+  
+//  Serial.println(F("End Initial"));
   //Move to reset the limit switch
   xStepper.setCurrentPosition(0);
   long tempGap = -distanceToSteps(gap);
   xStepper.runToNewPosition(tempGap);
+  readStates();
   
   //Move Slower to fine tune hitting the limit switch
-  while (stateX != LOW) {
+  xStepper.setSpeed(SPEED / 1.5);
+  while (stateX == LOW) {
     xStepper.runSpeed();
-    do{
+    while(stateP == LOW){
       readStates();
-    }while(stateP == LOW);
+    }
 //    Serial.println(F("Hitting X Switch"));
-    readStates();
+    if(counter > 200){
+      readStates();
+      counter = 0;
+    }
+    counter++;
   }
+  
+  xStepper.setSpeed(SPEED);
 
   digitalWrite(sleepPinX, LOW);
   
   //Y Homing
-
+  counter = 0;
   digitalWrite(sleepPinY, HIGH);
+  delay(5);
   
   //Initial Move to limit switch
-  while (stateY != LOW) {
+  while (stateY == LOW) {
     yStepper.runSpeed();
-    do{
+    while(stateP == LOW){
       readStates();
-    }while(stateP == LOW);
+    }
 //    Serial.println(F("Hitting Y Switch"));
-    readStates();
+    if(counter > 200){
+      readStates();
+      counter = 0;
+    }
+    counter++;
   }
+  counter = 0;
   
   //Move to reset the limit switch
   yStepper.setCurrentPosition(0);
-  tempGap = -distanceToSteps(gap);
+  tempGap = distanceToSteps(gap);
   yStepper.runToNewPosition(tempGap);
+  readStates();
+
+  yStepper.setSpeed(-SPEED);
   
   //Move Slower to fine tune hitting the limit switch
-  while (stateY != LOW) {
+  while (stateY == LOW) {
     yStepper.runSpeed();
-    do{
+    while(stateP == LOW){
       readStates();
-    }while(stateP == LOW);
+    }
 //    Serial.println(F("Hitting Y Switch"));
-    readStates();
+    if(counter > 200){
+      readStates();
+      counter = 0;
+    }
+    counter++;
   }
+
+  yStepper.setSpeed(-SPEED * 1.5);
 
   pos[0] = distanceToSteps(0);
   pos[1] = distanceToSteps(0);
   xStepper.setCurrentPosition(pos[0]);
   yStepper.setCurrentPosition(pos[1]);
   
-
   digitalWrite(sleepPinX, HIGH);
   
   return true;
-}
-
-/* MoveX / MoveY moves the corresponding stepper motor to a step position
- * Parameters: long steps, the desired position of the stepper motor
- * Returns void
- */
-void moveX(long steps){
-  Serial.println("(X) Moving to: " + String(steps) );
-  xStepper.setCurrentPosition(pos[0]);
-  while(xStepper.currentPosition() != steps){
-    if(steps < pos[0]){
-      xStepper.setSpeed(-SPEED);
-    }else{
-      xStepper.setSpeed(SPEED);
-    }
-    xStepper.runSpeed();
-  }
-}
-void moveY(long steps){
-  Serial.println("(Y) Moving to: " + String(steps) );
-  yStepper.setCurrentPosition(pos[1]);
-  while(yStepper.currentPosition() != steps){
-    if(steps < pos[1]){
-      yStepper.setSpeed(-SPEED);
-    }else{
-      yStepper.setSpeed(SPEED);
-    }
-    yStepper.runSpeed();
-  }
 }
 
 /* wait
@@ -296,70 +307,97 @@ void wait(char axis){
  * Parameters: None
  * Returns void
  */
-void snake() {
+void snake(){
   readStates();
-  while(stateP != LOW){
-    readStates();
+  long xSteps = distanceToSteps(xSize);
+  long ySteps = distanceToSteps(ySize);
+  uint8_t mod = 0;
+  if(xSize == 2.172){
+    mod = 7;
   }
-  Serial.println(F("Begin Snake"));
-  long xSteps = distanceToSteps(ySize);
-  long ySteps = distanceToSteps(xSize);
-  double halfX = xSteps * arrSizeX / 2;
-  
-  for(int y = 0; y < arrSizeY; y++){
-    //Check if there is a searchable grid in the row, and checks for what side of the dish it is on
-    bool validRow = false;
-    int tempX = 0;
-    if(pos[0] < halfX){
-      while(tempX < arrSizeX && !grids[y][tempX]){
-        tempX++;
+  bool check = false;
+  for(int i = 1; i < arrSizeY; i++){
+    Serial.print(F("Row: "));
+    Serial.println(String(i));
+    digitalWrite(sleepPinX, HIGH);
+    delay(5);
+    for(int j = 1 + mod; j < (arrSizeX - mod); j++){
+      while(stateP == LOW){
+        digitalWrite(sleepPinX, LOW);
+        readStates();
+        if(stateP == HIGH){
+          digitalWrite(sleepPinX, HIGH);
+          delay(5);
+        }
       }
-    }else{
-      tempX = arrSizeX - 1;
-      while(tempX >= 0 && !grids[y][tempX]){
-        tempX--;
+      if(grids[i][j]){
+        pos[0] = -j * xSteps;
+        Serial.print(F("J: "));
+        Serial.println(String(j));
+        xStepper.runToNewPosition(pos[0]);
+        wait('X');
+        grids[i][j] = false;
+        check = true;
+
+      }else{
+        if(check){
+          j = arrSizeX;
+          check = false;
+        }
       }
-    }
-    if(grids[y][tempX]){
-      validRow = true;
+      
+      readStates();
     }
     
-    if (validRow) {
-      //Move to where tempX is
-      pos[0] = tempX * xSteps;
-      moveX(pos[0]);
-      wait('X');
-      if (tempX < arrSizeX / 2){
-        //Move right through the row
-        while(tempX < arrSizeX && grids[y][tempX]){
-//          Serial.println(F("Move Right"));
-          long temp = pos[0] + xSteps;
-          moveX(temp);
-          pos[0] = temp;
-          wait('X');
-          grids[y][tempX] = false;
-          tempX++;
-        }
-      } else{        
-        //Move left through the row
-        while(tempX >= 0 && grids[y][tempX]){
-//          Serial.println(F("Move Left"));
-          long temp = pos[0] - xSteps;
-          moveX(temp);
-          pos[0] = temp;
-          wait('X');
-          grids[y][tempX] = false;
-          tempX--;
+    xStepper.runToNewPosition(pos[0]);
+
+    pos[1] += ySteps;
+    digitalWrite(sleepPinY, HIGH);
+    yStepper.runToNewPosition(pos[1]);
+    i++;
+    wait('Y');
+
+    for(int j = arrSizeX - 1 - mod; j >= mod + 1; j--){
+      readStates();
+      while(stateP == LOW){
+        digitalWrite(sleepPinX, LOW);
+        readStates();
+        if(stateP == HIGH){
+          digitalWrite(sleepPinX, HIGH);
+          delay(5);
         }
       }
+      
+      if(grids[i][j]){
+        pos[0] = -j * xSteps;
+        Serial.print(F("J: "));
+        Serial.println(String(j));
+        xStepper.runToNewPosition(pos[0]);
+        wait('X');
+        grids[i][j] = false;
+        check = true;
+      }else{
+        if(check){
+          j = arrSizeX;
+          check = false;
+        }
+      }
+
     }
-    //Move Down one row
+    pos[1] += ySteps;
     digitalWrite(sleepPinY, HIGH);
-    delay(5);
-    long temp = pos[1] - ySteps;
-    moveY(temp);
-    pos[1] = temp;
+    yStepper.runToNewPosition(pos[1]);
     wait('Y');
+    
+    readStates();
+    while(stateP == LOW){
+      digitalWrite(sleepPinX, LOW);
+      readStates();
+      if(stateP == HIGH){
+        digitalWrite(sleepPinX, HIGH);
+        delay(5);
+      }
+    }
   }
 }
 
