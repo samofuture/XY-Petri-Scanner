@@ -10,6 +10,15 @@
 
 #include <AccelStepper.h>
 
+//Make PIE_MOD_X 1 and PIE_MOD_Y 1 to do all of Petri Dish
+//Make PIE_MOD_X 1 and PIE_MOD_Y 2 to do 1/2 of Petri Dish
+//Make PIE_MOD_X 2 and PIE_MOD_Y 2 to do 1/4 of Petri Dish
+
+//Cuts half of the X axis
+#define PIE_MOD_X 2
+//Cuts half of the Y axis
+#define PIE_MOD_Y 2
+
 //Pins for stepper drivers
 #define dirPinX 2
 #define stepPinX 3
@@ -146,6 +155,8 @@ void loop() {
 
   xStepper.runToNewPosition(-13 * xSteps);
   
+
+   
   snake();
   Serial.println(F("After Snake:"));
   displayGrids();
@@ -161,7 +172,7 @@ void loop() {
 void readStates() {
 //  stateX = digitalRead(switchPinX);
 //  stateY = digitalRead(switchPinY);
-  int samples = 10000;
+  int samples = 25000;
   for (int i = 0; i < samples; i++) {
     stateP = digitalRead(pausePin);
     if (stateP == LOW) {
@@ -302,11 +313,11 @@ void snake(){
   long ySteps = distanceToSteps(ySize);
 
   
-  for(int i = 0; i < arrSizeY; i++){
+  for(int i = 0; i < (arrSizeY / PIE_MOD_Y); i++){
     Serial.print(F("Row: "));
     Serial.println(String(i));
     int tempJ;
-    for(int j = 0; j < arrSizeX; j++){
+    for(int j = 0; j < (arrSizeX / PIE_MOD_X); j++){
       if(grids[i][j]){
         pos[0] = -j * xSteps;
         xStepper.runToNewPosition(pos[0]);
@@ -331,7 +342,7 @@ void snake(){
     Serial.println(String(i));
     pauser();
 
-    for(int j = arrSizeX - 1; j >= 0 && i < arrSizeY; j--){
+    for(int j = ( (arrSizeX - 1) / PIE_MOD_X); j >= 0 && i < (arrSizeY / PIE_MOD_Y); j--){
       if(grids[i][j]){
         pos[0] = -j * xSteps;
         xStepper.runToNewPosition(pos[0]);
